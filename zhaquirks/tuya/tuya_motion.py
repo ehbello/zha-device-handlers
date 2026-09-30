@@ -10,12 +10,15 @@ from zigpy.zcl.clusters.security import IasZone
 from zhaquirks import MotionWithReset
 from zhaquirks.builder import (
     LIGHT_LUX,
+    PERCENTAGE,
     BinarySensorDeviceClass,
     EntityPlatform,
     EntityType,
+    NumberDeviceClass,
     SensorDeviceClass,
     SensorStateClass,
     UnitOfLength,
+    UnitOfTemperature,
     UnitOfTime,
 )
 from zhaquirks.tuya import TuyaLocalCluster, TuyaPowerConfigurationCluster2AAA
@@ -1624,6 +1627,31 @@ base_tuya_motion = (
         step=1,
         translation_key="motion_detection_sensitivity",
         fallback_name="Motion detection sensitivity",
+    )
+    .tuya_number(
+        dp_id=104,
+        attribute_name="humidity_calibration",
+        type=t.int32s,
+        device_class=NumberDeviceClass.HUMIDITY,
+        unit=PERCENTAGE,
+        min_value=-30,
+        max_value=30,
+        step=1,
+        translation_key="humidity_offset",
+        fallback_name="Humidity offset",
+    )
+    .tuya_number(
+        dp_id=105,
+        attribute_name="temperature_calibration",
+        type=t.int32s,
+        device_class=NumberDeviceClass.TEMPERATURE_DELTA,
+        unit=UnitOfTemperature.CELSIUS,
+        min_value=-2,
+        max_value=2,
+        step=0.1,
+        multiplier=0.1,
+        translation_key="temperature_offset",
+        fallback_name="Temperature offset",
     )
     .add_to_registry()
 )

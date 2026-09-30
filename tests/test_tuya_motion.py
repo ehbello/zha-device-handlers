@@ -1,6 +1,7 @@
 """Tests for Tuya quirks."""
 
 import asyncio
+from unittest import mock
 
 import pytest
 from zha.quirks import DEVICE_REGISTRY
@@ -8,7 +9,7 @@ from zigpy.zcl import foundation
 from zigpy.zcl.clusters.measurement import IlluminanceMeasurement, OccupancySensing
 from zigpy.zcl.clusters.security import IasZone
 
-from tests.common import ClusterListener
+from tests.common import ClusterListener, wait_for_zigpy_tasks
 import zhaquirks
 import zhaquirks.tuya
 from zhaquirks.tuya.mcu import TuyaMCUCluster
@@ -193,6 +194,12 @@ ZCL_ZG204ZX_INDICATOR = b"\tL\x01\x00\x05\x6c\x01\x00\x01\x00"  # DP 108 = False
 ZCL_ZG204ZX_MOTION_SENS = (
     b"\tL\x01\x00\x05\x7b\x02\x00\x04\x00\x00\x00\x05"  # DP 123 = 5
 )
+ZCL_ZG204ZX_HUMIDITY_CAL = (
+    b"\tL\x01\x00\x05\x68\x02\x00\x04\xff\xff\xff\xfb"  # DP 104 = -5
+)
+ZCL_ZG204ZX_TEMPERATURE_CAL = (
+    b"\tL\x01\x00\x05\x69\x02\x00\x04\x00\x00\x00\x0f"  # DP 105 = 15
+)
 
 
 @pytest.mark.parametrize(
@@ -205,6 +212,8 @@ ZCL_ZG204ZX_MOTION_SENS = (
         (ZCL_ZG204ZX_LUX_INTERVAL, "illuminance_interval", 15),
         (ZCL_ZG204ZX_INDICATOR, "indicator", 0),
         (ZCL_ZG204ZX_MOTION_SENS, "motion_detection_sensitivity", 5),
+        (ZCL_ZG204ZX_HUMIDITY_CAL, "humidity_calibration", -5),
+        (ZCL_ZG204ZX_TEMPERATURE_CAL, "temperature_calibration", 15),
     ],
 )
 @pytest.mark.parametrize("manufacturer", ["_TZE200_w0ap83qu", "HOBEIAN"])
@@ -254,3 +263,23 @@ async def test_zg204zx_does_not_shadow_standard_clusters(
     # The quirk adds no local shadow of the device's real measurement clusters.
     for ep_attribute in ("occupancy", "temperature", "humidity", "illuminance"):
         assert not hasattr(ep, ep_attribute)
+
+
+async def test_zg204zx_write_negative_calibration(zigpy_device_from_v2_quirk):
+    """Test that a negative calibration is sent as a signed Tuya value datapoint."""
+    quirked_device = zigpy_device_from_v2_quirk("HOBEIAN", "ZG-204ZX")
+    tuya_cluster = quirked_device.endpoints[1].tuya_manufacturer
+
+    with mock.patch.object(
+        tuya_cluster.endpoint, "request", return_value=foundation.Status.SUCCESS
+    ) as m1:
+        (status,) = await tuya_cluster.write_attributes(
+            {"temperature_calibration": -15}
+        )
+        await wait_for_zigpy_tasks()
+
+        # DP 105, type value (0x02), length 4, -15 as big-endian int32
+        assert m1.call_args.kwargs["data"].endswith(b"\x69\x02\x00\x04\xff\xff\xff\xf1")
+        assert status == [
+            foundation.WriteAttributesStatusRecord(foundation.Status.SUCCESS)
+        ]
