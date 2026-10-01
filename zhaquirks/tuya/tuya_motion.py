@@ -1653,6 +1653,12 @@ base_tuya_motion = (
         translation_key="temperature_offset",
         fallback_name="Temperature offset",
     )
+    # A multisensor: presence should not take over the device name
+    .change_entity_metadata(
+        endpoint_id=1,
+        cluster_id=IasZone.cluster_id,
+        new_primary=False,
+    )
     .add_to_registry()
 )
 

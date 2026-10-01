@@ -283,3 +283,14 @@ async def test_zg204zx_write_negative_calibration(zigpy_device_from_v2_quirk):
         assert status == [
             foundation.WriteAttributesStatusRecord(foundation.Status.SUCCESS)
         ]
+
+
+async def test_zg204zx_presence_not_primary(zigpy_device_from_v2_quirk):
+    """Test that the IAS zone presence entity is not made the primary entity."""
+    quirked_device = zigpy_device_from_v2_quirk("HOBEIAN", "ZG-204ZX")
+    entry = DEVICE_REGISTRY.match_entry(quirked_device)
+
+    (changed,) = entry.zha_device_factory.quirk_definition.changed_entity_metadata
+    assert changed.endpoint_id == 1
+    assert changed.cluster_id == IasZone.cluster_id
+    assert changed.new_primary is False
